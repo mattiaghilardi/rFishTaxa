@@ -95,9 +95,15 @@ get_cas <- function(query,type){
         xml2::xml_text() %>%
         tibble::enframe() %>%
         dplyr::mutate(value = stringr::str_squish(value)) %>%
-        dplyr::filter(value != "") %>%
+        dplyr::filter(value != "")
+      queries = if (type == "genus_family") {
+        gsub(" .*", "", result$value)
+      } else {
+        stringr::str_extract(result$value, "[a-z]+, [A-Za-z]+")
+      }
+      result = result %>%
+        cbind(query = queries) %>%
         dplyr::mutate(
-          query = stringr::str_extract(value, "[a-z]+, [A-Za-z]+"),
           content = stringr::str_extract(value, "(?<=Current status: ).*"),
           species = stringr::str_split(content,"\\. ",simplify = T)[,1],
           family = stringr::str_split(content,"\\. ",simplify = T)[,2],
