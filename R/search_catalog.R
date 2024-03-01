@@ -12,6 +12,8 @@
 #' \item author : Author(s) returned.
 #' \item family : Family(subfamily) of species.
 #' \item status : Current status including validation, synonym, and uncertainty.
+#' \item distribution : species distribution
+#' \item habitat : species habitat (freshwater, brackish, marine)
 #' }
 #' @return Data frame.
 #' @author Liuyong Ding \email{ly_ding@126.com}
@@ -25,10 +27,14 @@
 #' @importFrom dplyr mutate
 #' @importFrom stringr str_squish
 #' @importFrom dplyr filter
+#' @importFrom dplyr case_when
+#' @importFrom dplyr select
+#' @importFrom dplyr distinct
 #' @importFrom stringr str_extract
 #' @importFrom stringr str_split
 #' @importFrom stringr str_trim
 #' @importFrom stringr str_locate_all
+#' @importFrom stringr str_replace_all
 #' @importFrom stringr str_sub
 #' @importFrom tibble as_tibble
 #' @importFrom utils browseURL
@@ -101,21 +107,38 @@ get_cas <- function(query,type){
       } else {
         stringr::str_extract(result$value, "[a-z]+, [A-Za-z]+")
       }
-      result = result %>%
+      result = result$value %>%
+        stringr::str_extract("(?<=Current status: ).*") %>%
+        stringr::str_split("\\. ", simplify = T) %>%
+        as.data.frame() %>%
         cbind(query = queries) %>%
-        dplyr::mutate(
-          content = stringr::str_extract(value, "(?<=Current status: ).*"),
-          species = stringr::str_split(content,"\\. ",simplify = T)[,1],
-          family = stringr::str_split(content,"\\. ",simplify = T)[,2],
-          species_author = stringr::str_trim(ifelse(grepl("Valid as",species),gsub("Valid as ","",species),
-                                                    ifelse(grepl("Synonym of",species),gsub("Synonym of ","",species),
-                                                           ifelse(grepl("Uncertain as",species),gsub("Uncertain as ","",species),species)))),
-          status = ifelse(grepl("Valid as",species),"Validation",
-                          ifelse(grepl("Synonym of",species),"Synonym",
-                                 ifelse(grepl("Uncertain as",species),"Uncertainty",NA)))
-        ) %>%
+        # Remove empty rows and unknowns
         na.omit() %>%
-        dplyr::select(query,species_author,family,status)
+        dplyr::filter(V1 != "Unknown") %>%
+        dplyr::mutate(
+          # Concatenate to facilitate extraction
+          string = apply(., 1, function(x) paste(x, collapse = "_")),
+          # Detect errors with str_split caused by dots in author names
+          error = ifelse(endsWith(V2, "idae") | endsWith(V2, "inae")
+                         | endsWith(V2, "idae.") | endsWith(V2, "inae."),
+                         0, 1),
+          # Fix errors
+          status_species = ifelse(error == 0, V1, paste(V1, V2)),
+          family = ifelse(error == 0, V2, V3),
+          # Get distribution and habitat
+          distribution = stringr::str_extract(string, "(?<=Distribution: ).+?(?=\\_)"),
+          habitat = stringr::str_extract(string, "(?<=Habitat: ).+?(?=\\._)"),
+          # Get species_author and status
+          species_author = stringr::str_trim(
+            dplyr::case_when(grepl("Valid as",status_species) ~ gsub("Valid as ","",status_species),
+                             grepl("Synonym of",status_species) ~ gsub("Synonym of ","",status_species),
+                             grepl("Uncertain as",status_species) ~ gsub("Uncertain as ","",status_species))
+          ),
+          status = dplyr::case_when(grepl("Valid as",status_species) ~ "Validation",
+                                    grepl("Synonym of",status_species) ~ "Synonym",
+                                    grepl("Uncertain as",status_species) ~ "Uncertainty")
+        ) %>%
+        dplyr::select("query","species_author","family","status","distribution","habitat")
 
       dd = stringr::str_locate_all(result$species_author, " ")
       end = c()
@@ -139,16 +162,22 @@ get_cas <- function(query,type){
       )
       result$species = stringr::str_sub(result$species_author, 1, end - 1)
       result$author = stringr::str_sub(result$species_author, end + 1)
+      # Remove parenthesis from author
+      result$author = stringr::str_replace_all(result$author, c("\\(" = "", "\\)" = ""))
       #result$family = gsub(":.*","",result$family)
       result$family = gsub(": ","_",result$family)
+      result$family = gsub("\\.","",result$family)
+      result = dplyr::select(result,
+                             "query","species_author","species","author",
+                             "family","status","distribution","habitat")
       if(type == "genus_family"){
         names(result)[2] = "genus_author"
-        names(result)[5] = "genus"
-        result$family = gsub("\\.","",result$family)
-        #result$family = gsub(":.*","",result$family)
-        result$family = gsub(": ","_",result$family)
+        names(result)[3] = "genus"
+        # No distribution and habitat for genera
+        result = dplyr::select(result, -c("distribution","habitat"))
       }
-      return(tibble::as_tibble(result[,c(1,2,5,6,3,4)]))
+      # Remove duplicates
+      return(tibble::as_tibble(dplyr::distinct(result)))
     }
   }else{
     cat("Error request - the parameter query is not valid")

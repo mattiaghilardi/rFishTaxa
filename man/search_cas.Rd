@@ -12,6 +12,8 @@ The following data frame of the fields to be returned are recognized:
 \item author : Author(s) returned.
 \item family : Family(subfamily) of species.
 \item status : Current status including validation, synonym, and uncertainty.
+\item distribution : species distribution
+\item habitat : species habitat (freshwater, brackish, marine)
 }
 }
 \usage{
