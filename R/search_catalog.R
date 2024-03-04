@@ -120,7 +120,8 @@ get_cas <- function(query,type){
           string = apply(., 1, function(x) paste(x, collapse = "_")),
           # Detect errors with str_split caused by dots in author names
           error = ifelse(endsWith(V2, "idae") | endsWith(V2, "inae")
-                         | endsWith(V2, "idae.") | endsWith(V2, "inae."),
+                         | endsWith(V2, "idae.") | endsWith(V2, "inae.")
+                         | endsWith(V2, "incertae sedis") | endsWith(V2, "-clade\""),
                          0, 1),
           # Fix errors
           status_species = ifelse(error == 0, V1, paste(V1, V2)),
