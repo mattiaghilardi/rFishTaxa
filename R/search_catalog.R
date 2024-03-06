@@ -141,6 +141,8 @@ get_cas <- function(query,type){
         ) %>%
         dplyr::select("query","species_author","family","status","distribution","habitat")
 
+      attributes(result)$na.action <- NULL
+
       dd = stringr::str_locate_all(result$species_author, " ")
       end = c()
       switch(type, `genus_family` = {
