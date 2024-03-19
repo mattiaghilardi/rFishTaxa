@@ -114,6 +114,7 @@ get_cas <- function(query,type){
       }
       result = result$value %>%
         stringr::str_extract("(?<=Current status: ).*") %>%
+        gsub(", Habitat:", ". Habitat:", .) %>% # Fix cases with comma instead of dot
         stringr::str_split("\\. ", simplify = T) %>%
         as.data.frame() %>%
         cbind(query = queries,
@@ -134,12 +135,12 @@ get_cas <- function(query,type){
                             | endsWith(V2, "incertae sedis") | endsWith(V2, "-clade\""),
                             0, 1),
           # Fix errors
-          status_species = dplyr::case_when(error_v3 == 1 ~ paste(V1, V2, V3),
+          status_species = dplyr::case_when(error_v3 == 1 & error_v2 == 1 ~ paste(V1, V2, V3),
                                             error_v3 == 0 & error_v2 == 1 ~ paste(V1, V2),
-                                            error_v3 == 0 & error_v2 == 0 ~ V1),
-          family = dplyr::case_when(error_v3 == 1 ~ V4,
+                                            error_v3 == 1 & error_v2 == 0 ~ V1),
+          family = dplyr::case_when(error_v3 == 1 & error_v2 == 1 ~ V4,
                                     error_v3 == 0 & error_v2 == 1 ~ V3,
-                                    error_v3 == 0 & error_v2 == 0 ~ V2),
+                                    error_v3 == 1 & error_v2 == 0 ~ V2),
           # Get distribution and habitat
           distribution = stringr::str_extract(string, "(?<=Distribution: ).+?(?=\\_)"),
           habitat = stringr::str_extract(string, "(?<=Habitat: ).+?(?=\\._)"),
