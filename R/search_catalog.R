@@ -7,13 +7,14 @@
 #' @format The following data frame of the fields to be returned are recognized:
 #' \itemize{
 #' \item query : family, genus, and species matched.
+#' \item spid(genid) : species(genus) id.
 #' \item species(genus)_author : species(genus) and author(s) returned.
 #' \item species(genus) : Species(genus) returned.
 #' \item author : Author(s) returned.
 #' \item family : Family(subfamily) of species.
 #' \item status : Current status including validation, synonym, and uncertainty.
-#' \item distribution : species distribution
-#' \item habitat : species habitat (freshwater, brackish, marine)
+#' \item distribution : species distribution.
+#' \item habitat : species habitat (freshwater, brackish, marine).
 #' }
 #' @return Data frame.
 #' @author Liuyong Ding \email{ly_ding@126.com}
@@ -97,6 +98,10 @@ get_cas <- function(query,type){
     if (length(result) == 0) {
       message(paste("No match found for", query))
     } else {
+      id = result %>%
+        as.character() %>%
+        # genid for type="genus_family", spid for others, id=\ captures both
+        stringr::str_extract('(?<=id=\").+?(?=\">)')
       result = result %>%
         xml2::xml_text() %>%
         tibble::enframe() %>%
@@ -111,7 +116,8 @@ get_cas <- function(query,type){
         stringr::str_extract("(?<=Current status: ).*") %>%
         stringr::str_split("\\. ", simplify = T) %>%
         as.data.frame() %>%
-        cbind(query = queries) %>%
+        cbind(query = queries,
+              spid = id) %>%
         # Remove empty rows and unknowns
         na.omit() %>%
         dplyr::filter(V1 != "Unknown") %>%
@@ -139,7 +145,7 @@ get_cas <- function(query,type){
                                     grepl("Synonym of",status_species) ~ "Synonym",
                                     grepl("Uncertain as",status_species) ~ "Uncertainty")
         ) %>%
-        dplyr::select("query","species_author","family","status","distribution","habitat")
+        dplyr::select("query", "spid", "species_author","family","status","distribution","habitat")
 
       attributes(result)$na.action <- NULL
 
@@ -171,11 +177,12 @@ get_cas <- function(query,type){
       result$family = gsub(": ","_",result$family)
       result$family = gsub("\\.","",result$family)
       result = dplyr::select(result,
-                             "query","species_author","species","author",
+                             "query", "spid", "species_author","species","author",
                              "family","status","distribution","habitat")
       if(type == "genus_family"){
-        names(result)[2] = "genus_author"
-        names(result)[3] = "genus"
+        names(result)[2] = "genid"
+        names(result)[3] = "genus_author"
+        names(result)[4] = "genus"
         # No distribution and habitat for genera
         result = dplyr::select(result, -c("distribution","habitat"))
       }
