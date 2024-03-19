@@ -125,13 +125,21 @@ get_cas <- function(query,type){
           # Concatenate to facilitate extraction
           string = apply(., 1, function(x) paste(x, collapse = "_")),
           # Detect errors with str_split caused by dots in author names
-          error = ifelse(endsWith(V2, "idae") | endsWith(V2, "inae")
-                         | endsWith(V2, "idae.") | endsWith(V2, "inae.")
-                         | endsWith(V2, "incertae sedis") | endsWith(V2, "-clade\""),
-                         0, 1),
+          error_v3 = ifelse(endsWith(V3, "idae") | endsWith(V3, "inae")
+                            | endsWith(V3, "idae.") | endsWith(V3, "inae.")
+                            | endsWith(V3, "incertae sedis") | endsWith(V3, "-clade\""),
+                            0, 1),
+          error_v2 = ifelse(endsWith(V2, "idae") | endsWith(V2, "inae")
+                            | endsWith(V2, "idae.") | endsWith(V2, "inae.")
+                            | endsWith(V2, "incertae sedis") | endsWith(V2, "-clade\""),
+                            0, 1),
           # Fix errors
-          status_species = ifelse(error == 0, V1, paste(V1, V2)),
-          family = ifelse(error == 0, V2, V3),
+          status_species = dplyr::case_when(error_v3 == 1 ~ paste(V1, V2, V3),
+                                            error_v3 == 0 & error_v2 == 1 ~ paste(V1, V2),
+                                            error_v3 == 0 & error_v2 == 0 ~ V1),
+          family = dplyr::case_when(error_v3 == 1 ~ V4,
+                                    error_v3 == 0 & error_v2 == 1 ~ V3,
+                                    error_v3 == 0 & error_v2 == 0 ~ V2),
           # Get distribution and habitat
           distribution = stringr::str_extract(string, "(?<=Distribution: ).+?(?=\\_)"),
           habitat = stringr::str_extract(string, "(?<=Habitat: ).+?(?=\\._)"),
